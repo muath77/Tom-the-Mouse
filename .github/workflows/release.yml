@@ -1,0 +1,29 @@
+name: Build and draft release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test gestures and scrolling
+        run: bash test.sh
+      - name: Build universal app
+        run: bash build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tom-the-Mouse-macOS
+          path: build/Tom-the-Mouse-macOS.zip
+      - name: Create draft release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" build/Tom-the-Mouse-macOS.zip \
+            --draft --verify-tag --title "Tom the Mouse $RELEASE_TAG" \
+            --notes "Free middle-button gestures and scroll-wheel reversal by Muath Fathi Hussin Souki. Requires macOS 13 or later. This build is ad-hoc signed and not notarized. See README for setup."
