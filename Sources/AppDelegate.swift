@@ -9,7 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var activityLabel: NSTextField!
     private var thresholdLabel: NSTextField!
     private var enabledButton: NSButton!
-    private var pauseMenuItem: NSMenuItem!
+    private var quickControls: MouseControlsPopover!
     private var permissionTimer: Timer?
     private var clickCount = 0
 
@@ -58,27 +58,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "computermouse", accessibilityDescription: "Tom the Mouse")
         statusItem.button?.toolTip = "Tom the Mouse — free mouse gestures"
-        let menu = NSMenu()
-        let heading = NSMenuItem(title: "Tom the Mouse", action: nil, keyEquivalent: "")
-        heading.isEnabled = false
-        menu.addItem(heading)
-        menu.addItem(.separator())
+        quickControls = MouseControlsPopover(
+            showSettings: { [weak self] in self?.showSettings() },
+            toggleGestures: { [weak self] in self?.toggleFromMenu() },
+            quit: { [weak self] in self?.quitApp() })
+        statusItem.button?.target = self
+        statusItem.button?.action = #selector(toggleQuickControls)
+        statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         let settings = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
-        menu.addItem(settings)
-        pauseMenuItem = NSMenuItem(title: service.enabled ? "Pause gestures" : "Resume gestures", action: #selector(toggleFromMenu), keyEquivalent: "")
-        pauseMenuItem.target = self
-        menu.addItem(pauseMenuItem)
-        menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit Tom the Mouse", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self
-        menu.addItem(quit)
-        statusItem.menu = menu
         let mainMenu = NSMenu()
         let appMenu = NSMenu()
         let root = NSMenuItem()
         root.submenu = appMenu
         appMenu.addItem(settings.copy() as! NSMenuItem)
+        let controls = NSMenuItem(title: "Mouse controls…", action: #selector(toggleQuickControls), keyEquivalent: "")
+        controls.target = self
+        appMenu.addItem(controls)
         appMenu.addItem(.separator())
         appMenu.addItem(quit.copy() as! NSMenuItem)
         mainMenu.addItem(root)
@@ -156,7 +154,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.contentView?.addSubview(control)
     }
 
+    @objc private func toggleQuickControls() {
+        guard let button = statusItem.button else { return }
+        quickControls.toggle(relativeTo: button, enabled: service.enabled)
+    }
+
     @objc private func showSettings() {
+        quickControls.close()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
@@ -167,7 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func updateEnabled(_ value: Bool) {
         defaults.set(value, forKey: "enabled")
         enabledButton.state = value ? .on : .off
-        pauseMenuItem.title = value ? "Pause gestures" : "Resume gestures"
+        quickControls.update(enabled: value)
         service.setEnabled(value)
     }
 
